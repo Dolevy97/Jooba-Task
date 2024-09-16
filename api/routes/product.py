@@ -144,3 +144,50 @@ def all_products():
 
     except Exception as e:
         return jsonify({'message': f'Failed to get all products: {str(e)}'}), 500
+    
+@bp.route('/update_product/<string:product_id>', methods=['PUT'])
+def update_product(product_id):
+    data = request.get_json()
+    id_token = data.get('idToken')
+    if not data:
+        return jsonify({'messsage':'No data provided for update'}), 400
+    
+    try:
+        ref = db.reference('products')
+        current_products = ref.get()
+        
+        decoded_token = auth.verify_id_token(id_token)
+        uid = decoded_token['uid']
+        
+        user = auth.get_user(uid)
+        email = user.email
+        
+        if not current_products:
+            return jsonify({'message': 'No products found'}), 404
+        
+        product_to_update = next((p for p in current_products if p.get('id') == product_id), None)
+        
+        if not product_to_update:
+            return jsonify({'message': 'Product not found'}), 404
+        
+        if product_to_update.get('created_by') != email:
+            return jsonify({'message': 'Unauthorized to update this product'}), 403
+        
+        if 'name' in data:
+            product_to_update['name'] = data['name']
+        if 'description' in data:
+            product_to_update['description'] = data['description']
+        if 'category' in data:
+            product_to_update['category'] = data['category']
+        if 'price' in data:
+            product_to_update['price'] = data['price']
+            
+        product_to_update['updated_at'] = datetime.now(timezone.utc).isoformat()
+        updated_products = [p if p.get('id') != product_id else product_to_update for p in current_products]
+        ref.set(updated_products)
+        return jsonify({'message': 'Product updated successfully', 'product': product_to_update}), 200
+    except auth.InvalidIdTokenError:
+        return jsonify({'message': 'Invalid ID Token'}), 401
+    except Exception as e:
+        return jsonify({'message': f'Failed to update product: {str(e)}'}), 500
+    return jsonify(product_id)
