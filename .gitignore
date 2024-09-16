@@ -1,0 +1,45 @@
+# Byte-compiled files
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+
+# Virtual environment
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Test and coverage reports
+.coverage
+*.cover
+nosetests.xml
+coverage.xml
+*.log
+*.tmp
+
+# PyCharm and other IDEs
+.idea/
+.vscode/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Django
+*.sqlite3
+db.sqlite3
+
+# Flask
+instance/
+*.pid
+
+# Environment variables
+.env
+*.env
