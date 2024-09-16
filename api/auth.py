@@ -10,9 +10,7 @@ def login():
     
     if not id_token:
         return jsonify({'message': 'ID Token is missing'})
-    try:
-        # Verify the ID token using firebase admin SDK
-        
+    try:        
         decoded_token = auth.verify_id_token(id_token)
         uid = decoded_token['uid']
         

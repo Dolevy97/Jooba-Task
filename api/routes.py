@@ -31,17 +31,20 @@ def upload_product():
         
         current_products = ref.get()
         
-        # Now lets check if our sample product is there, and if so we filter it out
-        
+        if current_products is None:
+            current_products = []
+                    
         if isinstance(current_products, list):
             # Filter out the sample product if it exists
-            updated_products = [p for p in current_products if p.get('name') != 'Sample Product']
+            updated_products = [p for p in current_products if isinstance(p, dict) and p.get('name') != 'Sample Product']
         else:
-            # If current_products is not a list, initialize as empty list
+            # If current_products is not a list, initialize as an empty list
             updated_products = []
+
 
         product_id = str(uuid.uuid4()) # Generate a unique ID
         new_product = {
+            'id': product_id,
             'name': product.get('name'),
             'price': product.get('price'),
             'category': product.get('category'),
@@ -53,6 +56,10 @@ def upload_product():
         
         updated_products.append(new_product)
         ref.set(updated_products)
+        
+        # Debugging: Print to console
+        print(f"Saved product with ID: {product_id} and data: {new_product}")
+        
         return jsonify({'message': 'Product added successfully!', 'product_id': product_id}), 201
 
     except auth.InvalidIdTokenError:
@@ -86,3 +93,54 @@ def user_products():
 
     except Exception as e:
         return jsonify({'message': f'Failed to get products: {str(e)}'}), 500
+
+
+@routes.route('/delete_product/<string:product_id>', methods=['DELETE'])
+def delete_product(product_id):
+    data = request.get_json()
+    id_token = data.get('idToken')
+    
+    if not id_token:
+        return jsonify({'message': 'ID Token is required'}), 400
+    
+    try:
+        # Verify the ID token to authenticate the user
+        decoded_token = auth.verify_id_token(id_token)
+        uid = decoded_token['uid']
+        
+        user = auth.get_user(uid)
+        email = user.email
+        
+        
+        # Reference user's products in the Realtime DB
+        ref = db.reference(f'users/{uid}/products')
+        current_products = ref.get()
+        
+        # print(f"Current Products: {current_products}")  # Debugging: Print current products
+
+        if current_products is None:
+            current_products = []
+        
+        product_to_delete = next((p for p in current_products if p.get('id') == product_id), None)
+        print('product_to_delete:', product_to_delete)
+        
+            
+        if not product_to_delete:
+            return jsonify({'message': 'Product not found'}), 404
+        
+        # Check if the user is authorized to delete the product
+        if product_to_delete.get('created_by') != email:
+            return jsonify({'message': 'Unauthorized to delete this product'}), 403
+        
+        updated_products = [p for p in current_products if p.get('id') != product_id]
+        
+        if len(updated_products) == len(current_products):
+            return jsonify({'message': 'Product not found'}), 404
+        ref.set(updated_products)
+        return jsonify({'message':'Product deleted successfully'}), 200
+    
+    except auth.InvalidIdTokenError:
+        return jsonify({'message': 'Invalid ID Token'}), 401
+
+    except Exception as e:
+        return jsonify({'message': f'Failed to delete product: {str(e)}'}), 500
