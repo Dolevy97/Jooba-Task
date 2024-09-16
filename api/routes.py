@@ -112,31 +112,23 @@ def delete_product(product_id):
         return jsonify({'message': 'ID Token is required'}), 400
     
     try:
-        # Verify the ID token to authenticate the user
         decoded_token = auth.verify_id_token(id_token)
         uid = decoded_token['uid']
         
         user = auth.get_user(uid)
         email = user.email
         
-        
-        # Reference user's products in the Realtime DB
-        ref = db.reference(f'users/{uid}/products')
+        ref = db.reference('products')
         current_products = ref.get()
         
-        # print(f"Current Products: {current_products}")  # Debugging: Print current products
-
         if current_products is None:
             current_products = []
         
         product_to_delete = next((p for p in current_products if p.get('id') == product_id), None)
-        print('product_to_delete:', product_to_delete)
-        
             
         if not product_to_delete:
             return jsonify({'message': 'Product not found'}), 404
         
-        # Check if the user is authorized to delete the product
         if product_to_delete.get('created_by') != email:
             return jsonify({'message': 'Unauthorized to delete this product'}), 403
         
@@ -155,4 +147,20 @@ def delete_product(product_id):
     
 @routes.route('/product_info/<string:product_id>', methods=['GET'])
 def product_info(product_id):
-    return jsonify(product_id)
+    data = request.get_json()
+    id_token = data.get('idToken')
+    
+    if not id_token:
+        return jsonify({'message': 'ID Token is required'}), 400
+    
+    try:
+        ref = db.reference('products')
+        current_products = ref.get()
+        product = next((p for p in current_products if p.get('id') == product_id), None)
+        return jsonify(product)
+    
+    except auth.InvalidIdTokenError:
+        return jsonify({'message': 'Invalid ID Token'}), 401
+
+    except Exception as e:
+        return jsonify({'message': f'Failed to get product info: {str(e)}'}), 500
