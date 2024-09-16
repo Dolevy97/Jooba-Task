@@ -157,10 +157,36 @@ def product_info(product_id):
         ref = db.reference('products')
         current_products = ref.get()
         product = next((p for p in current_products if p.get('id') == product_id), None)
-        return jsonify(product)
+        
+        if product is None:
+            return jsonify({'message': 'Product not found'}), 404
+        
+        return jsonify(product), 200
     
     except auth.InvalidIdTokenError:
         return jsonify({'message': 'Invalid ID Token'}), 401
 
     except Exception as e:
         return jsonify({'message': f'Failed to get product info: {str(e)}'}), 500
+    
+@routes.route('/all_products', methods=['GET'])
+def all_products():
+    data = request.get_json()
+    id_token = data.get('idToken')
+    
+    if not id_token:
+        return jsonify({'message': 'ID Token is required'}), 400
+    
+    try:
+        ref = db.reference('products')
+        current_products = ref.get()
+
+        if current_products is None:
+            return jsonify({'message': 'No products found'}), 404
+
+        return jsonify(current_products), 200
+    except auth.InvalidIdTokenError:
+        return jsonify({'message': 'Invalid ID Token'}), 401
+
+    except Exception as e:
+        return jsonify({'message': f'Failed to get all products: {str(e)}'}), 500
