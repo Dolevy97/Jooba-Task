@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from firebase_admin import auth, db
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 routes = Blueprint('routes', __name__)
 
@@ -28,24 +28,27 @@ def upload_product():
         ref = db.reference(f'users/{uid}/products')
         
         current_products = ref.get()
-        # Now lets check if our sample product is there, and if so we delete it
         
-        if current_products:
-            updated_products = {k: v for k, v in current_products.items() if v['name'] != 'Sample Product'}
-            ref.set(updated_products)
+        # Now lets check if our sample product is there, and if so we filter it out
         
-        # After all the checks and methods, now we can add the products
-        
+        if isinstance(current_products, list):
+            # Filter out the sample product if it exists
+            updated_products = [p for p in current_products if p.get('name') != 'Sample Product']
+        else:
+            # If current_products is not a list, initialize as empty list
+            updated_products = []
+
         product_id = str(uuid.uuid4()) # Generate a unique ID
         new_product = {
             'name': product.get('name'),
             'price': product.get('price'),
             'category': product.get('category'),
             'description': product.get('description'),
-            'created_at': datetime.utcnow().isoformat()
+            'created_at': datetime.now(timezone.utc).isoformat()
         }
         
-        ref.child(product_id).set(new_product)
+        updated_products.append(new_product)
+        ref.set(updated_products)
         return jsonify({'message': 'Product added successfully!', 'product_id': product_id}), 201
 
     except auth.InvalidIdTokenError:
