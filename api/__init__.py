@@ -13,9 +13,9 @@ def create_app():
     })
     
     # Register Blueprints
-    from .routes import routes
-    from .auth import auth_blueprint as auth
-    app.register_blueprint(routes, url_prefix='/')
-    app.register_blueprint(auth, url_prefix='/')
+    from .routes import user, auth, product
+    app.register_blueprint(user.bp)
+    app.register_blueprint(auth.bp)
+    app.register_blueprint(product.bp)
     
     return app

@@ -1,9 +1,9 @@
 from flask import Blueprint, request, jsonify, current_app
 from firebase_admin import auth, db
 
-auth_blueprint = Blueprint('auth', __name__)
+bp = Blueprint('auth', __name__)
 
-@auth_blueprint.route('/login', methods=['POST'])
+@bp.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
     id_token = data.get('idToken')
@@ -26,7 +26,7 @@ def login():
     except Exception as e:
         return jsonify({'message': f'Login failed: {str(e)}'}), 500
 
-@auth_blueprint.route('/logout', methods=['POST'])
+@bp.route('/logout', methods=['POST'])
 def logout():
     data = request.get_json()
     id_token = data.get('idToken')
@@ -44,7 +44,7 @@ def logout():
     except Exception as e:
         return jsonify({'message': f'Logout failed: {str(e)}'}), 500
 
-@auth_blueprint.route('/register', methods=['POST'])
+@bp.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
     
