@@ -23,7 +23,9 @@ def upload_product():
         # First, lets check the ID token to see if the user is authenticated
         decoded_token = auth.verify_id_token(id_token)
         uid = decoded_token['uid']
-        
+
+        user = auth.get_user(uid)
+        email = user.email
         # Now, we go to the realtime DB to reference the user's products
         ref = db.reference(f'users/{uid}/products')
         
@@ -44,7 +46,9 @@ def upload_product():
             'price': product.get('price'),
             'category': product.get('category'),
             'description': product.get('description'),
-            'created_at': datetime.now(timezone.utc).isoformat()
+            'created_by': email,
+            'created_at': datetime.now(timezone.utc).isoformat(),
+            'updated_at': datetime.now(timezone.utc).isoformat(),
         }
         
         updated_products.append(new_product)
@@ -56,3 +60,29 @@ def upload_product():
 
     except Exception as e:
         return jsonify({'message': f'Failed to add product: {str(e)}'}), 500
+    
+@routes.route('/user_products', methods=['GET'])
+def user_products():
+    data = request.get_json()
+    id_token = data.get('idToken')
+
+    if not id_token:
+        return jsonify({'message': 'ID Token is required'}), 400
+    
+    try:
+        decoded_token = auth.verify_id_token(id_token)
+        uid = decoded_token['uid']
+        
+        ref = db.reference(f'users/{uid}/products')
+        products = ref.get()
+        
+        # Filtering to remove none or nulls due to placeholders
+        if isinstance(products, list):
+            products = [p for p in products if p is not None]
+            
+        return jsonify({'products': products}), 200
+    except auth.InvalidIdTokenError:
+        return jsonify({'message': 'Invalid ID Token'}), 401
+
+    except Exception as e:
+        return jsonify({'message': f'Failed to get products: {str(e)}'}), 500
