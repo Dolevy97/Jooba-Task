@@ -14,10 +14,23 @@ def login():
         decoded_token = auth.verify_id_token(id_token)
         uid = decoded_token['uid']
         
-        # Get the data (products list) from the DB
-        ref = db.reference(f'users/{uid}')
-        user_data = ref.get()
+        # Get the user's email
+        user = auth.get_user(uid)
+        email = user.email
         
+        # Get all products from the database
+        ref = db.reference('products')
+        all_products = ref.get()
+        
+        if all_products:
+            user_products = [p for p in all_products if p.get('created_by') == email]
+        else:
+            user_products = []
+            
+        user_data = {
+            'email': email,
+            'products': user_products
+        }
         return jsonify({'message': 'Login successful!', 'user': user_data}), 200
     
     except auth.InvalidIdTokenError:
@@ -55,21 +68,26 @@ def register():
         return jsonify({'message': 'Email and password are required'}), 400
 
     try:
-        # Here, I create a new user with Firebase Auth
         user = auth.create_user(
             email=email,
             password=password
         )
         
-        # and here, I create a new entry in the Realtime Database to save the email and the products
-        ref = db.reference('users')
-        user_ref = ref.child(user.uid)
+        custom_token = auth.create_custom_token(user.uid)
+        user_info = auth.get_user(user.uid)
+        
         user_data = {
-            'email': email,
-            'products': [{"name": "Sample Product", "price": 0, "category": "Test" , "description": "This is a sample product"}]
+            'uid': user.uid,
+            'email': user_info.email,
+            'products': []
         }
-        user_ref.set(user_data)
-        return jsonify({'message': 'User registered successfully!', 'uid': user.uid}), 201
+
+        return jsonify({
+            'message': 'User registered and logged in successfully!',
+            'user': user_data,
+            'customToken': custom_token.decode('utf-8'),
+            'expiresIn': 3600
+        }), 201
     except Exception as e:
         print(f"Unexpected error during registration:")
         return jsonify({'message': f'Registration failed: {str(e)}'}), 500

@@ -190,4 +190,3 @@ def update_product(product_id):
         return jsonify({'message': 'Invalid ID Token'}), 401
     except Exception as e:
         return jsonify({'message': f'Failed to update product: {str(e)}'}), 500
-    return jsonify(product_id)
