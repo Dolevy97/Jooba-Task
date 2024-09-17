@@ -1,6 +1,5 @@
 from flask import Blueprint, request, jsonify
 from firebase_admin import auth, db
-import uuid
 from datetime import datetime, timezone
 
 bp = Blueprint('product', __name__)
@@ -14,9 +13,13 @@ def product_info(product_id):
         return jsonify({'message': 'ID Token is required'}), 400
     
     try:
+        decoded_token = auth.verify_id_token(id_token)
+        uid = decoded_token['uid']
+        
         ref = db.reference('products')
         current_products = ref.get()
-        product = next((p for p in current_products if p.get('id') == product_id), None)
+        
+        product = current_products.get(product_id, None)
         
         if product is None:
             return jsonify({'message': 'Product not found'}), 404
@@ -62,8 +65,14 @@ def search_products():
     try:
         ref = db.reference('products')
         all_products = ref.get()
+        
+        if all_products is None:
+            return jsonify({'message': 'No products found'}), 404
+        
+        products_list = list(all_products.values())
+        
         matching_products = [
-            p for p in all_products if search_query in p.get('name','').lower()
+            p for p in products_list if search_query in p.get('name','').lower()
         ]
         return jsonify({
             'message': f'Found {len(matching_products)} matching products',
@@ -84,11 +93,13 @@ def products_by_category():
         ref = db.reference('products')
         all_products = ref.get()
         
-        if not all_products:
+        if all_products is None:
             return jsonify({'message':'No products found in the database'}), 404
         
+        products_list = list(all_products.values())
+        
         matching_products = [
-            p for p in all_products
+            p for p in products_list
             if p.get('category','').lower() == category_name
         ]
         return jsonify({
@@ -119,16 +130,9 @@ def upload_product():
         current_products = ref.get()
         
         if current_products is None:
-            current_products = []
+            current_products = {}
 
-        if not isinstance(current_products, list):
-            return jsonify({'message': 'Error: Product data is corrupted'}), 500
-
-        updated_products = [p for p in current_products if isinstance(p, dict) and p.get('name') != 'Sample Product']
-
-        product_id = str(uuid.uuid4())
         new_product = {
-            'id': product_id,
             'name': product.get('name'),
             'price': product.get('price'),
             'category': product.get('category'),
@@ -137,9 +141,8 @@ def upload_product():
             'created_at': datetime.now(timezone.utc).isoformat(),
             'updated_at': datetime.now(timezone.utc).isoformat(),
         }
-        
-        updated_products.append(new_product)
-        ref.set(updated_products)
+        new_product_ref = ref.push(new_product)
+        product_id = new_product_ref.key
         
         print(f"Saved product with ID: {product_id} and data: {new_product}")
         
@@ -151,6 +154,41 @@ def upload_product():
     except Exception as e:
         return jsonify({'message': f'Failed to add product: {str(e)}'}), 500
 
+@bp.route('/bulk_upload_products', methods=['POST'])
+def bulk_upload_products():
+    data = request.get_json()
+    id_token = data.get('idToken')
+    products = data.get('products')
+    if not data or not isinstance(products, list):
+        return jsonify({'message': 'Invalid data format. Expected a list of products'}), 400
+    if not id_token:
+        return jsonify({'message': 'ID Token is required'}), 400
+    
+    try:
+        decoded_token = auth.verify_id_token(id_token)
+        uid = decoded_token['uid']
+
+        user = auth.get_user(uid)
+        email = user.email
+
+        ref = db.reference('products')
+        uploaded_products = []
+        for product in products:
+            if 'name' not in product or 'price' not in product or 'description' not in product or 'category' not in product:
+                return jsonify({'message': 'Missing product fields'}), 400
+            product['created_at'] = datetime.now(timezone.utc).isoformat()
+            product['updated_at'] = datetime.now(timezone.utc).isoformat()
+            product['created_by'] = email
+            new_product_ref = ref.push(product)
+            product['id'] = new_product_ref.key
+            uploaded_products.append(product)
+        return jsonify({'message': 'Products uploaded successfully', 'products':uploaded_products})
+    except auth.InvalidIdTokenError:
+        return jsonify({'message': 'Invalid ID Token'}), 401
+
+    except Exception as e:
+        return jsonify({'message': f'Failed to add product: {str(e)}'}), 500
+    
 @bp.route('/delete_product/<string:product_id>', methods=['DELETE'])
 def delete_product(product_id):
     data = request.get_json()
@@ -170,9 +208,9 @@ def delete_product(product_id):
         current_products = ref.get()
         
         if current_products is None:
-            current_products = []
+            current_products = {}
         
-        product_to_delete = next((p for p in current_products if p.get('id') == product_id), None)
+        product_to_delete = current_products.get(product_id)
             
         if not product_to_delete:
             return jsonify({'message': 'Product not found'}), 404
@@ -180,11 +218,7 @@ def delete_product(product_id):
         if product_to_delete.get('created_by') != email:
             return jsonify({'message': 'Unauthorized to delete this product'}), 403
         
-        updated_products = [p for p in current_products if p.get('id') != product_id]
-        
-        if len(updated_products) == len(current_products):
-            return jsonify({'message': 'Product not found'}), 404
-        ref.set(updated_products)
+        ref.child(product_id).delete()
         return jsonify({'message':'Product deleted successfully'}), 200
     
     except auth.InvalidIdTokenError:
@@ -197,43 +231,42 @@ def delete_product(product_id):
 def update_product(product_id):
     data = request.get_json()
     id_token = data.get('idToken')
+     
     if not data:
         return jsonify({'messsage':'No data provided for update'}), 400
     
     try:
-        ref = db.reference('products')
-        current_products = ref.get()
-        
         decoded_token = auth.verify_id_token(id_token)
         uid = decoded_token['uid']
-        
         user = auth.get_user(uid)
         email = user.email
         
-        if not current_products:
-            return jsonify({'message': 'No products found'}), 404
+        ref = db.reference('products')
         
-        product_to_update = next((p for p in current_products if p.get('id') == product_id), None)
+        current_product = ref.child(product_id).get()
         
-        if not product_to_update:
+        if current_product is None:
             return jsonify({'message': 'Product not found'}), 404
         
-        if product_to_update.get('created_by') != email:
+        if current_product.get('created_by') != email:
             return jsonify({'message': 'Unauthorized to update this product'}), 403
         
+        updates = {}
         if 'name' in data:
-            product_to_update['name'] = data['name']
+            updates['name'] = data['name']
         if 'description' in data:
-            product_to_update['description'] = data['description']
+            updates['description'] = data['description']
         if 'category' in data:
-            product_to_update['category'] = data['category']
+            updates['category'] = data['category']
         if 'price' in data:
-            product_to_update['price'] = data['price']
+            updates['price'] = data['price']
+        if updates:
+            updates['updated_at'] = datetime.now(timezone.utc).isoformat()
+            ref.child(product_id).update(updates)
             
-        product_to_update['updated_at'] = datetime.now(timezone.utc).isoformat()
-        updated_products = [p if p.get('id') != product_id else product_to_update for p in current_products]
-        ref.set(updated_products)
-        return jsonify({'message': 'Product updated successfully', 'product': product_to_update}), 200
+        updated_product = ref.child(product_id).get()
+        return jsonify({'message': 'Product updated successfully', 'product': updated_product}), 200
+    
     except auth.InvalidIdTokenError:
         return jsonify({'message': 'Invalid ID Token'}), 401
     except Exception as e:

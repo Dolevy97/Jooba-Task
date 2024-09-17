@@ -14,20 +14,21 @@ def user_products():
     try:
         decoded_token = auth.verify_id_token(id_token)
         uid = decoded_token['uid']
-        
         user = auth.get_user(uid)
         email = user.email
         
         ref = db.reference('products')
         products = ref.get()
         
-        # Filtering to remove none or nulls due to placeholders
-        if isinstance(products, list):
-            user_products = [p for p in products if p.get('created_by') == email]
+        user_products = []
+        if isinstance(products, dict):
+            user_products = [
+                p for p in products.values()
+                if p.get('created_by') == email
+            ]
         else:
             user_products = []
         
-        user_products = [p for p in user_products if p is not None]
         return jsonify({'products': user_products}), 200
     except auth.InvalidIdTokenError:
         return jsonify({'message': 'Invalid ID Token'}), 401
