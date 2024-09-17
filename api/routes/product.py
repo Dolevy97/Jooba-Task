@@ -5,6 +5,71 @@ from datetime import datetime, timezone
 
 bp = Blueprint('product', __name__)
 
+@bp.route('/product_info/<string:product_id>', methods=['GET'])
+def product_info(product_id):
+    data = request.get_json()
+    id_token = data.get('idToken')
+    
+    if not id_token:
+        return jsonify({'message': 'ID Token is required'}), 400
+    
+    try:
+        ref = db.reference('products')
+        current_products = ref.get()
+        product = next((p for p in current_products if p.get('id') == product_id), None)
+        
+        if product is None:
+            return jsonify({'message': 'Product not found'}), 404
+        
+        return jsonify(product), 200
+    
+    except auth.InvalidIdTokenError:
+        return jsonify({'message': 'Invalid ID Token'}), 401
+
+    except Exception as e:
+        return jsonify({'message': f'Failed to get product info: {str(e)}'}), 500
+
+@bp.route('/all_products', methods=['GET'])
+def all_products():
+    data = request.get_json()
+    id_token = data.get('idToken')
+    
+    if not id_token:
+        return jsonify({'message': 'ID Token is required'}), 400
+    
+    try:
+        ref = db.reference('products')
+        current_products = ref.get()
+
+        if current_products is None:
+            return jsonify({'message': 'No products found'}), 404
+
+        return jsonify(current_products), 200
+    except auth.InvalidIdTokenError:
+        return jsonify({'message': 'Invalid ID Token'}), 401
+
+    except Exception as e:
+        return jsonify({'message': f'Failed to get all products: {str(e)}'}), 500
+    
+
+@bp.route('/search_products', methods=["GET"])
+def search_products():
+    search_query = request.args.get('query', '')
+    
+    try:
+        ref = db.reference('products')
+        all_products = ref.get()
+        matching_products = [
+            p for p in all_products if search_query in p.get('name','').lower()
+        ]
+        return jsonify({
+            'message': f'Found {len(matching_products)} matching products',
+            'products': matching_products
+        }), 200
+    except Exception as e:
+        print(f"Error in search_products: {str(e)}")
+        return jsonify({'message': 'An error occurred while searching products'}), 500
+
 @bp.route('/upload_product', methods=['POST'])
 def upload_product():
     data = request.get_json()
@@ -98,52 +163,6 @@ def delete_product(product_id):
 
     except Exception as e:
         return jsonify({'message': f'Failed to delete product: {str(e)}'}), 500
-    
-@bp.route('/product_info/<string:product_id>', methods=['GET'])
-def product_info(product_id):
-    data = request.get_json()
-    id_token = data.get('idToken')
-    
-    if not id_token:
-        return jsonify({'message': 'ID Token is required'}), 400
-    
-    try:
-        ref = db.reference('products')
-        current_products = ref.get()
-        product = next((p for p in current_products if p.get('id') == product_id), None)
-        
-        if product is None:
-            return jsonify({'message': 'Product not found'}), 404
-        
-        return jsonify(product), 200
-    
-    except auth.InvalidIdTokenError:
-        return jsonify({'message': 'Invalid ID Token'}), 401
-
-    except Exception as e:
-        return jsonify({'message': f'Failed to get product info: {str(e)}'}), 500
-    
-@bp.route('/all_products', methods=['GET'])
-def all_products():
-    data = request.get_json()
-    id_token = data.get('idToken')
-    
-    if not id_token:
-        return jsonify({'message': 'ID Token is required'}), 400
-    
-    try:
-        ref = db.reference('products')
-        current_products = ref.get()
-
-        if current_products is None:
-            return jsonify({'message': 'No products found'}), 404
-
-        return jsonify(current_products), 200
-    except auth.InvalidIdTokenError:
-        return jsonify({'message': 'Invalid ID Token'}), 401
-
-    except Exception as e:
-        return jsonify({'message': f'Failed to get all products: {str(e)}'}), 500
     
 @bp.route('/update_product/<string:product_id>', methods=['PUT'])
 def update_product(product_id):
