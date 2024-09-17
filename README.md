@@ -9,12 +9,18 @@ This project is a RESTful API built using **Flask** to manage products. It integ
   
 - **Product Upload**: Registered users can upload products, and the data will be stored in the Firebase Realtime Database.
   - **Endpoint**: `[POST] /upload_product`
+  - 
+- **Bulk Product Upload**: Registered users can upload products in bulk, and the data will be stored in the Firebase Realtime Database.
+  - **Endpoint**: `[POST] /bulk_upload_products`
   
 - **View User Products**: Users can retrieve all the products they have uploaded.
   - **Endpoint**: `[GET] /user_products`
   
 - **Delete Product**: Users can delete a specific product they uploaded by its ID.
   - **Endpoint**: `[DELETE] /delete_product/<product_id>`
+  
+- **Bulk Delete Products**: Users can delete products they uploaded by their IDs in bulk.
+  - **Endpoint**: `[DELETE] /bulk_delete_products`
   
 - **View Product Details**: Retrieve detailed information about a specific product by its ID.
   - **Endpoint**: `[GET] /product_info/<product_id>`
