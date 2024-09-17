@@ -200,7 +200,6 @@ def delete_product(product_id):
     try:
         decoded_token = auth.verify_id_token(id_token)
         uid = decoded_token['uid']
-        
         user = auth.get_user(uid)
         email = user.email
         
@@ -226,12 +225,50 @@ def delete_product(product_id):
 
     except Exception as e:
         return jsonify({'message': f'Failed to delete product: {str(e)}'}), 500
+
+@bp.route('/bulk_delete_products', methods=['DELETE'])
+def bulk_delete_products():
+    data = request.get_json()
+    id_token = data.get('idToken')
+    product_ids = data.get('product_ids')
     
+    if not id_token or not isinstance(product_ids, list):
+        return jsonify({'message': 'ID Token and list of product IDs are required.'}), 400
+    
+    try:
+        decoded_token = auth.verify_id_token(id_token)
+        uid = decoded_token['uid']
+        user = auth.get_user(uid)
+        email = user.email
+        
+        ref = db.reference('products')
+        products = ref.get()
+        
+        if products is None or not isinstance(products, dict):
+            return jsonify({'message':'No products found'}), 404
+        
+        deleted_products = []
+        for product_id in product_ids:
+            product = products.get(product_id)
+            if product and product.get('created_by') == email:
+                ref.child(product_id).delete()
+                deleted_products.append(product_id)
+                
+        return jsonify({
+            'message': f'Successfully deleted {len(deleted_products)} products',
+            'deleted_product_ids': deleted_products
+        }), 200
+    except auth.InvalidIdTokenError:
+        return jsonify({'message': 'Invalid ID Token'}), 401
+
+    except Exception as e:
+        return jsonify({'message': f'Failed to delete product: {str(e)}'}), 500
+
 @bp.route('/update_product/<string:product_id>', methods=['PUT'])
 def update_product(product_id):
     data = request.get_json()
     id_token = data.get('idToken')
-     
+    
     if not data:
         return jsonify({'messsage':'No data provided for update'}), 400
     
