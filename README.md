@@ -1,4 +1,4 @@
-# Jooba Product Management System
+# Product Management System
 
 This project is a RESTful API built using **Flask** to manage products. It integrates **Firebase Realtime Database** for storing product data and **Firebase Authentication** for managing user authentication. The system allows users to register, upload products, retrieve their products, delete products, and perform other CRUD operations.
 
