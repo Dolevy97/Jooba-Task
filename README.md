@@ -9,7 +9,7 @@ This project is a RESTful API built using **Flask** to manage products. It integ
   
 - **Product Upload**: Registered users can upload products, and the data will be stored in the Firebase Realtime Database.
   - **Endpoint**: `[POST] /upload_product`
-  - 
+    
 - **Bulk Product Upload**: Registered users can upload products in bulk, and the data will be stored in the Firebase Realtime Database.
   - **Endpoint**: `[POST] /bulk_upload_products`
   
