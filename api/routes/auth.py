@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify
 from firebase_admin import auth, db
 
 bp = Blueprint('auth', __name__)
@@ -9,16 +9,13 @@ def login():
     id_token = data.get('idToken')
     
     if not id_token:
-        return jsonify({'message': 'ID Token is missing'})
+        return jsonify({'message': 'ID Token is required'})
     try:        
         decoded_token = auth.verify_id_token(id_token)
         uid = decoded_token['uid']
-        
-        # Get the user's email
         user = auth.get_user(uid)
         email = user.email
         
-        # Get all products from the database
         ref = db.reference('products')
         all_products = ref.get()
         
@@ -43,6 +40,7 @@ def login():
 def logout():
     data = request.get_json()
     id_token = data.get('idToken')
+    
     if not id_token:
         return jsonify({'message': 'ID token is required for logout'}), 400
     

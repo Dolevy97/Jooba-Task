@@ -54,9 +54,14 @@ def all_products():
     except Exception as e:
         return jsonify({'message': f'Failed to get all products: {str(e)}'}), 500
     
-
 @bp.route('/search_products', methods=["GET"])
 def search_products():
+    data = request.get_json()
+    id_token = data.get('idToken')
+    
+    if not id_token:
+        return jsonify({'message': 'ID Token is required.'}), 400
+    
     search_query = request.args.get('query', '')
     
     if not search_query:
@@ -78,6 +83,9 @@ def search_products():
             'message': f'Found {len(matching_products)} matching products',
             'products': matching_products
         }), 200
+    
+    except auth.InvalidIdTokenError:
+        return jsonify({'message': 'Invalid ID Token'}), 401
     except Exception as e:
         print(f"Error in search_products: {str(e)}")
         return jsonify({'message': 'An error occurred while searching products'}), 500
@@ -117,7 +125,7 @@ def upload_product():
     product = data.get('product')
     
     if not id_token or not product:
-        return jsonify({'message': 'ID Token and product data are required'}), 400
+        return jsonify({'message': 'ID Token and product data are required.'}), 400
     
     try:
         decoded_token = auth.verify_id_token(id_token)
@@ -160,9 +168,9 @@ def bulk_upload_products():
     id_token = data.get('idToken')
     products = data.get('products')
     if not data or not isinstance(products, list):
-        return jsonify({'message': 'Invalid data format. Expected a list of products'}), 400
+        return jsonify({'message': 'Invalid data format, Expected a list of products.'}), 400
     if not id_token:
-        return jsonify({'message': 'ID Token is required'}), 400
+        return jsonify({'message': 'ID Token is required.'}), 400
     
     try:
         decoded_token = auth.verify_id_token(id_token)
@@ -195,7 +203,7 @@ def delete_product(product_id):
     id_token = data.get('idToken')
     
     if not id_token:
-        return jsonify({'message': 'ID Token is required'}), 400
+        return jsonify({'message': 'ID Token is required.'}), 400
     
     try:
         decoded_token = auth.verify_id_token(id_token)
@@ -268,6 +276,9 @@ def bulk_delete_products():
 def update_product(product_id):
     data = request.get_json()
     id_token = data.get('idToken')
+    
+    if not id_token:
+        return jsonify({'message': 'ID Token is required.'}), 400
     
     if not data:
         return jsonify({'messsage':'No data provided for update'}), 400
