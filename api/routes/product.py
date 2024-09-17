@@ -56,11 +56,40 @@ def all_products():
 def search_products():
     search_query = request.args.get('query', '')
     
+    if not search_query:
+        return jsonify({'message': 'Search query is required.'})
+    
     try:
         ref = db.reference('products')
         all_products = ref.get()
         matching_products = [
             p for p in all_products if search_query in p.get('name','').lower()
+        ]
+        return jsonify({
+            'message': f'Found {len(matching_products)} matching products',
+            'products': matching_products
+        }), 200
+    except Exception as e:
+        print(f"Error in search_products: {str(e)}")
+        return jsonify({'message': 'An error occurred while searching products'}), 500
+    
+@bp.route('/products_by_category', methods=["GET"])
+def products_by_category():
+    category_name = request.args.get('category_name', '').lower()
+    
+    if not category_name:
+        return jsonify({'message':'Category name is required'}), 400
+    
+    try:
+        ref = db.reference('products')
+        all_products = ref.get()
+        
+        if not all_products:
+            return jsonify({'message':'No products found in the database'}), 404
+        
+        matching_products = [
+            p for p in all_products
+            if p.get('category','').lower() == category_name
         ]
         return jsonify({
             'message': f'Found {len(matching_products)} matching products',
